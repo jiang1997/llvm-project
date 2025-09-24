@@ -3170,9 +3170,8 @@ bool InterpretBuiltin(InterpState &S, CodePtr OpPC, const CallExpr *Call,
           unsigned BitWidth = Val.getBitWidth();
           uint64_t Shift = Idx.extractBitsAsZExtValue(8, 0);
           uint64_t Length = Idx.extractBitsAsZExtValue(8, 8);
-          if (Length > BitWidth) {
+          if (Length > BitWidth)
             Length = BitWidth;
-          }
 
           // Handle out of bounds cases.
           if (Length == 0 || Shift >= BitWidth)
