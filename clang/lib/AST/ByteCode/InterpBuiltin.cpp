@@ -3189,7 +3189,7 @@ bool InterpretBuiltin(InterpState &S, CodePtr OpPC, const CallExpr *Call,
         S, OpPC, Call, [](const APSInt &Val, const APSInt &Idx) {
           unsigned BitWidth = Val.getBitWidth();
           uint64_t Index = Idx.extractBitsAsZExtValue(8, 0);
-          APSInt Result = Val;
+          APInt Result = Val;
 
           if (Index < BitWidth)
             Result.clearHighBits(BitWidth - Index);
