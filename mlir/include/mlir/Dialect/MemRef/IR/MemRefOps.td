@@ -11,6 +11,7 @@
 
 include "mlir/Dialect/Arith/IR/ArithBase.td"
 include "mlir/Dialect/MemRef/IR/MemRefBase.td"
+include "mlir/Interfaces/AlignmentAttrInterface.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferIntRangeInterface.td"
@@ -64,7 +65,8 @@ class AllocLikeOp<string mnemonic,
                   list<Trait> traits = []> :
     MemRef_Op<mnemonic,
     !listconcat([
-      AttrSizedOperandSegments
+      AttrSizedOperandSegments,
+      DeclareOpInterfaceMethods<AlignmentAttrOpInterface>
     ], traits)> {
 
   let arguments = (ins Variadic<Index>:$dynamicSizes,
@@ -232,7 +234,8 @@ def MemRef_AllocOp : AllocLikeOp<"alloc", DefaultResource, [
 //===----------------------------------------------------------------------===//
 
 
-def MemRef_ReallocOp : MemRef_Op<"realloc"> {
+def MemRef_ReallocOp : MemRef_Op<"realloc",
+    [DeclareOpInterfaceMethods<AlignmentAttrOpInterface>]> {
   let summary = "memory reallocation operation";
   let description = [{
     The `realloc` operation changes the size of a memory region. The memory
@@ -1122,7 +1125,8 @@ def MemRef_GetGlobalOp : MemRef_Op<"get_global",
 // GlobalOp
 //===----------------------------------------------------------------------===//
 
-def MemRef_GlobalOp : MemRef_Op<"global", [Symbol]> {
+def MemRef_GlobalOp : MemRef_Op<"global", [Symbol,
+    DeclareOpInterfaceMethods<AlignmentAttrOpInterface>]> {
   let summary = "declare or define a global memref variable";
   let description = [{
     The `memref.global` operation declares or defines a named global memref
@@ -1197,6 +1201,7 @@ def LoadOp : MemRef_Op<"load",
                      "memref", "result",
                      "::llvm::cast<MemRefType>($_self).getElementType()">,
       MemRefsNormalizable,
+      DeclareOpInterfaceMethods<AlignmentAttrOpInterface>,
       DeclareOpInterfaceMethods<MemorySpaceCastConsumerOpInterface>,
       DeclareOpInterfaceMethods<PromotableMemOpInterface>,
       DeclareOpInterfaceMethods<DestructurableAccessorOpInterface>]> {
@@ -1964,6 +1969,7 @@ def MemRef_StoreOp : MemRef_Op<"store",
                      "memref", "value",
                      "::llvm::cast<MemRefType>($_self).getElementType()">,
       MemRefsNormalizable,
+      DeclareOpInterfaceMethods<AlignmentAttrOpInterface>,
       DeclareOpInterfaceMethods<MemorySpaceCastConsumerOpInterface>,
       DeclareOpInterfaceMethods<PromotableMemOpInterface>,
       DeclareOpInterfaceMethods<DestructurableAccessorOpInterface>]> {
