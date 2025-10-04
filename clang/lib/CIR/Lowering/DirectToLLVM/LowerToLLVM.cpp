@@ -32,6 +32,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "clang/CIR/Dialect/IR/CIRAttrs.h"
 #include "clang/CIR/Dialect/IR/CIRDialect.h"
+#include "clang/CIR/Dialect/IR/CIRTypes.h"
 #include "clang/CIR/Dialect/Passes.h"
 #include "clang/CIR/LoweringHelpers.h"
 #include "clang/CIR/MissingFeatures.h"
@@ -1711,6 +1712,11 @@ CIRToLLVMGlobalOpLowering::matchAndRewriteRegionInitializedGlobal(
 mlir::LogicalResult CIRToLLVMGlobalOpLowering::matchAndRewrite(
     cir::GlobalOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
+  // If this global requires non-trivial initialization or destruction,
+  // that needs to be moved to runtime handlers during LoweringPrepare.
+  if (!op.getCtorRegion().empty() || !op.getDtorRegion().empty())
+    return op.emitError() << "GlobalOp ctor and dtor regions should be removed "
+                             "in LoweringPrepare";
 
   std::optional<mlir::Attribute> init = op.getInitialValue();
 
@@ -2303,11 +2309,9 @@ mlir::LogicalResult CIRToLLVMSelectOpLowering::matchAndRewrite(
 static void prepareTypeConverter(mlir::LLVMTypeConverter &converter,
                                  mlir::DataLayout &dataLayout) {
   converter.addConversion([&](cir::PointerType type) -> mlir::Type {
-    // Drop pointee type since LLVM dialect only allows opaque pointers.
-    assert(!cir::MissingFeatures::addressSpace());
-    unsigned targetAS = 0;
-
-    return mlir::LLVM::LLVMPointerType::get(type.getContext(), targetAS);
+    unsigned addrSpace =
+        type.getAddrSpace() ? type.getAddrSpace().getValue().getUInt() : 0;
+    return mlir::LLVM::LLVMPointerType::get(type.getContext(), addrSpace);
   });
   converter.addConversion([&](cir::VPtrType type) -> mlir::Type {
     assert(!cir::MissingFeatures::addressSpace());
@@ -2420,7 +2424,7 @@ static void prepareTypeConverter(mlir::LLVMTypeConverter &converter,
 // For instance, this CIR code:
 //
 //    cir.func @foo(%arg0: !s32i) -> !s32i {
-//      %4 = cir.cast(int_to_bool, %arg0 : !s32i), !cir.bool
+//      %4 = cir.cast int_to_bool %arg0 : !s32i -> !cir.bool
 //      cir.if %4 {
 //        %5 = cir.const #cir.int<1> : !s32i
 //        cir.return %5 : !s32i
@@ -2994,8 +2998,13 @@ mlir::LogicalResult CIRToLLVMComplexRealOpLowering::matchAndRewrite(
     cir::ComplexRealOp op, OpAdaptor adaptor,
     mlir::ConversionPatternRewriter &rewriter) const {
   mlir::Type resultLLVMTy = getTypeConverter()->convertType(op.getType());
-  rewriter.replaceOpWithNewOp<mlir::LLVM::ExtractValueOp>(
-      op, resultLLVMTy, adaptor.getOperand(), llvm::ArrayRef<std::int64_t>{0});
+  mlir::Value operand = adaptor.getOperand();
+  if (mlir::isa<cir::ComplexType>(op.getOperand().getType())) {
+    operand = mlir::LLVM::ExtractValueOp::create(
+        rewriter, op.getLoc(), resultLLVMTy, operand,
+        llvm::ArrayRef<std::int64_t>{0});
+  }
+  rewriter.replaceOp(op, operand);
   return mlir::success();
 }
 

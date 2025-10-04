@@ -154,3 +154,68 @@ void choose_expr() {
 // OGCG:   %[[B_ADDR:.*]] = alloca %struct.CompleteS, align 4
 // OGCG:   %[[C_ADDR:.*]] = alloca %struct.CompleteS, align 4
 // OGCG:   call void @llvm.memcpy.p0.p0.i64(ptr align 4 %[[C_ADDR]], ptr align 4 %[[A_ADDR]], i64 8, i1 false)
+
+void generic_selection() {
+  CompleteS a;
+  CompleteS b;
+  int c;
+  CompleteS d = _Generic(c, int : a, default: b);
+}
+
+// CIR: cir.func{{.*}} @_Z17generic_selectionv()
+// CIR:   %[[A_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["a"]
+// CIR:   %[[B_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["b"]
+// CIR:   %[[C_ADDR:.*]] = cir.alloca !s32i, !cir.ptr<!s32i>, ["c"]
+// CIR:   %[[D_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["d", init]
+// TODO(cir): Call to default copy constructor should be replaced by `cir.copy` op
+// CIR:   cir.call @_ZN9CompleteSC1ERKS_(%[[D_ADDR]], %[[A_ADDR]]) nothrow : (!cir.ptr<!rec_CompleteS>, !cir.ptr<!rec_CompleteS>) -> ()
+
+// LLVM: define{{.*}} void @_Z17generic_selectionv()
+// LLVM:   %1 = alloca %struct.CompleteS, i64 1, align 4
+// LLVM:   %2 = alloca %struct.CompleteS, i64 1, align 4
+// LLVM:   %3 = alloca i32, i64 1, align 4
+// LLVM:   %4 = alloca %struct.CompleteS, i64 1, align 4
+// LLVM:   call void @_ZN9CompleteSC1ERKS_(ptr %4, ptr %1)
+
+// OGCG: define{{.*}} void @_Z17generic_selectionv()
+// OGCG:   %[[A_ADDR:.*]] = alloca %struct.CompleteS, align 4
+// OGCG:   %[[B_ADDR:.*]] = alloca %struct.CompleteS, align 4
+// OGCG:   %[[C_ADDR:.*]] = alloca i32, align 4
+// OGCG:   %[[D_ADDR:.*]] = alloca %struct.CompleteS, align 4
+// OGCG:   call void @llvm.memcpy.p0.p0.i64(ptr align 4 %[[D_ADDR]], ptr align 4 %[[A_ADDR]], i64 8, i1 false)
+
+void unary_extension() {
+  CompleteS a = __extension__ CompleteS();
+}
+
+// CIR: %[[A_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["a", init]
+// CIR: %[[ZERO_INIT:.*]] = cir.const #cir.zero : !rec_CompleteS
+// CIR: cir.store{{.*}} %[[ZERO_INIT]], %[[A_ADDR]] : !rec_CompleteS, !cir.ptr<!rec_CompleteS>
+
+// LLVM: %[[A_ADDR:.*]] = alloca %struct.CompleteS, i64 1, align 4
+// LLVM: store %struct.CompleteS zeroinitializer, ptr %[[A_ADDR]], align 4
+
+// OGCG: %[[A_ADDR:.*]] = alloca %struct.CompleteS, align 4
+// OGCG: call void @llvm.memset.p0.i64(ptr align 4 %[[A_ADDR]], i8 0, i64 8, i1 false)
+
+void bin_comma() { 
+  CompleteS a = (CompleteS(), CompleteS());
+}
+
+// CIR: cir.func{{.*}} @_Z9bin_commav()
+// CIR:   %[[A_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["a", init]
+// CIR:   %[[TMP_ADDR:.*]] = cir.alloca !rec_CompleteS, !cir.ptr<!rec_CompleteS>, ["agg.tmp0"]
+// CIR:   %[[ZERO:.*]] = cir.const #cir.zero : !rec_CompleteS
+// CIR:   cir.store{{.*}} %[[ZERO]], %[[TMP_ADDR]] : !rec_CompleteS, !cir.ptr<!rec_CompleteS>
+// CIR:   %[[ZERO:.*]] = cir.const #cir.zero : !rec_CompleteS
+// CIR:   cir.store{{.*}} %[[ZERO]], %[[A_ADDR]] : !rec_CompleteS, !cir.ptr<!rec_CompleteS>
+
+// LLVM: define{{.*}} void @_Z9bin_commav()
+// LLVM:   %[[A_ADDR:.*]] = alloca %struct.CompleteS, i64 1, align 4
+// LLVM:   %[[TMP_ADDR:.*]] = alloca %struct.CompleteS, i64 1, align 4
+// LLVM:   store %struct.CompleteS zeroinitializer, ptr %[[TMP_ADDR]], align 4
+// LLVM:   store %struct.CompleteS zeroinitializer, ptr %[[A_ADDR]], align 4
+
+// OGCG: define{{.*}} void @_Z9bin_commav()
+// OGCG:   %[[A_ADDR:.*]] = alloca %struct.CompleteS, align 4
+// OGCG:   call void @llvm.memset.p0.i64(ptr align 4 %[[A_ADDR]], i8 0, i64 8, i1 false)
